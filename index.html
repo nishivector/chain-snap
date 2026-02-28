@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Chain Snap</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #2E5A2E;
+      overflow: hidden;
+      width: 100vw; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #gameCanvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      touch-action: none;
+    }
+    #overlay2d {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+    #startScreen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      pointer-events: all;
+      cursor: pointer;
+      transition: opacity 0.3s ease;
+    }
+    #instructionsScreen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 10;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(42, 80, 42, 0.92);
+      pointer-events: all;
+      cursor: pointer;
+      transition: opacity 0.3s ease;
+    }
+    .instr-panel {
+      max-width: 480px;
+      width: 90%;
+      color: #EAFFCC;
+      font-family: 'Courier New', monospace;
+      text-align: center;
+      padding: 32px;
+    }
+    .instr-panel h2 {
+      font-size: 22px;
+      letter-spacing: 4px;
+      color: #8FD460;
+      margin-bottom: 24px;
+    }
+    .instr-panel p {
+      font-size: 15px;
+      line-height: 1.7;
+      margin-bottom: 16px;
+      color: #EAFFCC;
+      opacity: 0.9;
+    }
+    .instr-panel .tap-hint {
+      margin-top: 28px;
+      font-size: 13px;
+      letter-spacing: 4px;
+      color: #8FD460;
+      opacity: 0.8;
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    .instr-row {
+      display: flex;
+      align-items: flex-start;
+      text-align: left;
+      margin-bottom: 12px;
+      gap: 12px;
+    }
+    .instr-icon {
+      font-size: 20px;
+      min-width: 28px;
+    }
+    .instr-text {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #EAFFCC;
+      opacity: 0.85;
+    }
+  </style>
+
+  <!-- Tone.js FIRST, before importmap -->
+  <script src="https://cdn.jsdelivr.net/npm/tone@15.1.22/build/Tone.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<canvas id="overlay2d"></canvas>
+
+<!-- START SCREEN -->
+<div id="startScreen">
+  <!-- SVG Title with glow filter -->
+  <svg width="540" height="200" viewBox="0 0 540 200" xmlns="http://www.w3.org/2000/svg" style="max-width:90vw;height:auto;">
+    <defs>
+      <filter id="glow-outer" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="14" result="blur1"/>
+        <feColorMatrix type="matrix"
+          values="0 0 0 0 0.55
+                  0 0 0 0 0.95
+                  0 0 0 0 0.30
+                  0 0 0 2.5 -0.5" result="green-glow"/>
+        <feMerge>
+          <feMergeNode in="green-glow"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+      <filter id="glow-inner" x="-10%" y="-10%" width="120%" height="120%">
+        <feGaussianBlur stdDeviation="3" result="blur2"/>
+        <feMerge>
+          <feMergeNode in="blur2"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+    <text x="270" y="105"
+      font-family="'Courier New', monospace"
+      font-size="72" font-weight="900"
+      letter-spacing="8"
+      text-anchor="middle"
+      fill="#1A3A1A"
+      opacity="0.6"
+      transform="translate(3,4)">CHAIN SNAP</text>
+    <text x="270" y="105"
+      font-family="'Courier New', monospace"
+      font-size="72" font-weight="900"
+      letter-spacing="8"
+      text-anchor="middle"
+      fill="#8FD460"
+      filter="url(#glow-outer)"
+      opacity="0.9">
+      CHAIN SNAP
+      <animate attributeName="opacity" values="0.7;0.95;0.7" dur="2.4s" repeatCount="indefinite"/>
+    </text>
+    <text x="270" y="105"
+      font-family="'Courier New', monospace"
+      font-size="72" font-weight="900"
+      letter-spacing="8"
+      text-anchor="middle"
+      fill="#EAFFCC"
+      filter="url(#glow-inner)">
+      CHAIN SNAP
+      <animate attributeName="opacity" values="0.95;1.0;0.95" dur="2.4s" repeatCount="indefinite"/>
+    </text>
+    <text x="270" y="148"
+      font-family="'Courier New', monospace"
+      font-size="16" font-weight="400"
+      letter-spacing="6"
+      text-anchor="middle"
+      fill="#8FD460"
+      opacity="0.75">PULL · HOLD · LET GO</text>
+  </svg>
+
+  <!-- Tap button -->
+  <div style="margin-top:32px;">
+    <svg width="300" height="120" viewBox="0 0 540 120" xmlns="http://www.w3.org/2000/svg" style="max-width:80vw;height:auto;">
+      <defs>
+        <filter id="btn-glow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="8" result="blur"/>
+          <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+      <circle cx="270" cy="60" r="42" fill="none" stroke="#8FD460" stroke-width="1.5" opacity="0">
+        <animate attributeName="r" values="42;72" dur="1.8s" begin="0s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.7;0" dur="1.8s" begin="0s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="270" cy="60" r="42" fill="none" stroke="#8FD460" stroke-width="1.5" opacity="0">
+        <animate attributeName="r" values="42;72" dur="1.8s" begin="0.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.7;0" dur="1.8s" begin="0.6s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="270" cy="60" r="42" fill="none" stroke="#8FD460" stroke-width="1.5" opacity="0">
+        <animate attributeName="r" values="42;72" dur="1.8s" begin="1.2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.7;0" dur="1.8s" begin="1.2s" repeatCount="indefinite"/>
+      </circle>
+      <rect x="170" y="34" width="200" height="52" rx="26"
+        fill="#3A6B3A" stroke="#8FD460" stroke-width="2"
+        filter="url(#btn-glow)"/>
+      <text x="270" y="68"
+        font-family="'Courier New', monospace"
+        font-size="20" font-weight="700"
+        letter-spacing="4"
+        text-anchor="middle"
+        fill="#EAFFCC">TAP TO SNAP</text>
+    </svg>
+  </div>
+
+  <div style="margin-top:16px; font-family:'Courier New',monospace; font-size:11px; letter-spacing:3px; color:#8FD460; opacity:0.5;">
+    Round 17 · 108 BPM
+  </div>
+</div>
+
+<!-- INSTRUCTIONS SCREEN -->
+<div id="instructionsScreen">
+  <div class="instr-panel">
+    <h2>HOW TO PLAY</h2>
+    <div class="instr-row">
+      <div class="instr-icon">👆</div>
+      <div class="instr-text"><strong>Drag elastic links</strong> between glowing nodes to stretch them past the snap threshold.</div>
+    </div>
+    <div class="instr-row">
+      <div class="instr-icon">⚡</div>
+      <div class="instr-text"><strong>Links glow orange</strong> near the breaking point. Pull far enough and they SNAP — sending nodes flying!</div>
+    </div>
+    <div class="instr-row">
+      <div class="instr-icon">🔗</div>
+      <div class="instr-text"><strong>Chain reactions:</strong> Flying nodes smash into other clusters, triggering cascade snaps for massive points.</div>
+    </div>
+    <div class="instr-row">
+      <div class="instr-icon">⏱</div>
+      <div class="instr-text"><strong>Beat the timer.</strong> Hit the minimum snap count before time runs out. Aim for chains!</div>
+    </div>
+    <div class="instr-row">
+      <div class="instr-icon">🎯</div>
+      <div class="instr-text"><strong>Precision pays:</strong> Fast snaps, boundary hits, and deep chains all multiply your score.</div>
+    </div>
+    <p class="tap-hint">TAP TO BEGIN</p>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ─── CANVAS / RENDERER SETUP ───────────────────────────────────────────────
+const W = 540, H = 960;
+const canvas = document.getElementById('gameCanvas');
+const overlay = document.getElementById('overlay2d');
+const hudCtx = overlay.getContext('2d');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x3A6B3A);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x3A6B3A);
+
+// Orthographic camera: 540×960 world units
+const camera = new THREE.OrthographicCamera(-W/2, W/2, H/2, -H/2, -100, 100);
+camera.position.z = 10;
+
+// Bloom composer
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(W, H), 1.4, 18/W, 0.55);
+composer.addPass(bloomPass);
+
+// Letterbox / resize
+function handleResize() {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  renderer.setSize(vw, vh);
+  overlay.width = vw;
+  overlay.height = vh;
+  composer.setSize(vw, vh);
+}
+handleResize();
+window.addEventListener('resize', handleResize);
+
+// World-to-screen mapping
+function worldToScreen(wx, wy) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  // letterbox: game is 540x960, centered
+  const scale = Math.min(vw / W, vh / H);
+  const offX = (vw - W * scale) / 2;
+  const offY = (vh - H * scale) / 2;
+  return {
+    x: offX + (wx + W/2) * scale,
+    y: offY + (H/2 - wy) * scale
+  };
+}
+
+function screenToWorld(sx, sy) {
+  const rect = canvas.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const scale = Math.min(vw / W, vh / H);
+  const offX = (vw - W * scale) / 2;
+  const offY = (vh - H * scale) / 2;
+  return {
+    x: (sx - rect.left - offX) / scale - W/2,
+    y: -(sy - rect.top - offY) / scale + H/2
+  };
+}
+
+// ─── AUDIO SETUP ───────────────────────────────────────────────────────────
+let audioReady = false;
+let toneStarted = false;
+
+// Music parts
+let musicFilter, mainGain, drumPart, marimbaLFO;
+let pitchShiftTarget = 0;
+let currentPitch = 0;
+let dangerLFO, dangerGain;
+
+// SFX synths
+let stretchSynth, stretchFreqTarget = 220;
+let isStretching = false;
+let snapMetalSynth;
+let recoilMembrane;
+let chainSynth;
+let levelChimePoly;
+
+async function initAudio() {
+  if (toneStarted) return;
+  toneStarted = true;
+  try {
+    await Tone.start();
+
+    // Master gain
+    mainGain = new Tone.Gain(0.7).toDestination();
+
+    // High-pass filter for level-load effect
+    musicFilter = new Tone.Filter(800, 'highpass').connect(mainGain);
+
+    // Breath tone (C2 sine, LFO vibrato)
+    const breathVibrato = new Tone.LFO({ frequency: 0.8, type: 'sine', min: -5, max: 5 }).start();
+    const breathOsc = new Tone.Oscillator({ frequency: 65.4, type: 'sine' }).connect(musicFilter);
+    const breathGain = new Tone.Gain(0.06).connect(musicFilter);
+    breathVibrato.connect(breathOsc.frequency);
+    breathOsc.connect(breathGain);
+    breathOsc.start();
+
+    // Drum beat (4/4 at 108 BPM)
+    const drumSynth = new Tone.MembraneSynth({
+      pitchDecay: 0.05, octaves: 4,
+      envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 }
+    }).connect(musicFilter);
+    const drumGain = new Tone.Gain(0.4).connect(musicFilter);
+    drumSynth.connect(drumGain);
+
+    const beatInterval = 60 / 108; // seconds per beat
+    drumPart = new Tone.Sequence((time, step) => {
+      if (step === 0 || step === 2) {
+        drumSynth.triggerAttackRelease('C1', '8n', time, 0.8);
+      } else {
+        drumSynth.triggerAttackRelease('C1', '16n', time, 0.4);
+      }
+    }, [0, 1, 2, 3], '4n');
+    drumPart.start(0);
+    Tone.getTransport().bpm.value = 108;
+    Tone.getTransport().start();
+
+    // Sweep filter open over 1.8s (game start effect)
+    musicFilter.frequency.rampTo(80, 1.8);
+
+    // Marimba pattern (3-against-4)
+    const marimbaOsc = new Tone.Synth({
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.005, decay: 0.15, sustain: 0.1, release: 0.1 }
+    }).connect(musicFilter);
+    const marimbaGain = new Tone.Gain(0.15).connect(musicFilter);
+    marimbaOsc.connect(marimbaGain);
+
+    const marimbaPattern = new Tone.Pattern((time, note) => {
+      marimbaOsc.triggerAttackRelease(note, '16n', time, 0.5);
+    }, ['C4', 'E4', 'G4', 'A4', 'C5', 'A4', 'G4', 'E4'], 'up');
+    marimbaPattern.interval = '8t'; // triplet 8ths = 3-against-4
+    marimbaPattern.start(0);
+
+    // SFX: link stretch
+    stretchSynth = new Tone.Synth({
+      oscillator: { type: 'sawtooth' },
+      envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.2 }
+    });
+    const stretchGain = new Tone.Gain(-1).toDestination(); // -18dB ~ gain 0.125
+    stretchGain.gain.value = 0.125;
+    stretchSynth.connect(stretchGain);
+
+    // SFX: link snap (metal)
+    snapMetalSynth = new Tone.MetalSynth({
+      frequency: 400,
+      envelope: { attack: 0.001, decay: 0.08, release: 0.05 },
+      harmonicity: 5.1,
+      modulationIndex: 32,
+      resonance: 4000,
+      octaves: 1.5
+    }).toDestination();
+
+    // SFX: node recoil
+    recoilMembrane = new Tone.MembraneSynth({
+      pitchDecay: 0.08, octaves: 6,
+      envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.1 }
+    }).toDestination();
+    recoilMembrane.volume.value = -6;
+
+    // SFX: chain reaction
+    chainSynth = new Tone.Synth({
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.005, decay: 0.15, sustain: 0, release: 0.1 }
+    }).toDestination();
+    chainSynth.volume.value = -8;
+
+    // SFX: level clear chime
+    levelChimePoly = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.02, decay: 0.8, sustain: 0, release: 0.5 }
+    }).toDestination();
+    levelChimePoly.volume.value = -10;
+
+    // Danger LFO
+    dangerGain = new Tone.Gain(0).connect(mainGain);
+    const dangerDrone = new Tone.Oscillator({ frequency: 58.3, type: 'sine' }).connect(dangerGain);
+    dangerDrone.start();
+    dangerLFO = new Tone.LFO({ frequency: 3, type: 'square', min: 0, max: 0.08 }).connect(dangerGain.gain);
+
+    audioReady = true;
+  } catch(e) {
+    // Audio init failed silently
+  }
+}
+
+function playSnap(screenX) {
+  if (!audioReady) return;
+  try {
+    const pan = (screenX / window.innerWidth) * 2 - 1;
+    const panner = new Tone.Panner(pan).toDestination();
+    snapMetalSynth.connect(panner);
+    snapMetalSynth.triggerAttackRelease(400, '8n');
+    setTimeout(() => { try { snapMetalSynth.disconnect(panner); } catch(e) {} }, 300);
+  } catch(e) {}
+}
+
+function playChainNote(depth) {
+  if (!audioReady) return;
+  try {
+    const notes = ['E4', 'F#4', 'G#4', 'B4'];
+    const note = notes[Math.min(depth, 3)];
+    chainSynth.triggerAttackRelease(note, '16n', Tone.now() + depth * 0.08);
+  } catch(e) {}
+}
+
+function playRecoil() {
+  if (!audioReady) return;
+  try { recoilMembrane.triggerAttackRelease('C1', '8n'); } catch(e) {}
+}
+
+function playLevelClear() {
+  if (!audioReady) return;
+  try {
+    levelChimePoly.triggerAttackRelease(['C4', 'E4', 'G4', 'C5'], '2n');
+    if (mainGain) mainGain.gain.rampTo(1.0, 0.8);
+  } catch(e) {}
+}
+
+function playLevelFail() {
+  if (!audioReady) return;
+  try {
+    if (musicFilter) musicFilter.frequency.rampTo(40, 0.6);
+    setTimeout(() => {
+      try {
+        recoilMembrane.triggerAttackRelease('G0', '4n');
+        if (mainGain) mainGain.gain.rampTo(0.5, 0.4);
+      } catch(e) {}
+    }, 200);
+  } catch(e) {}
+}
+
+function startStretchSFX(ratio) {
+  if (!audioReady || !stretchSynth) return;
+  try {
+    if (!isStretching) {
+      isStretching = true;
+      stretchSynth.triggerAttack(220 + ratio * 440);
+    }
+    stretchFreqTarget = 220 + ratio * 440;
+    stretchSynth.frequency.rampTo(stretchFreqTarget, 0.05);
+  } catch(e) {}
+}
+
+function stopStretchSFX() {
+  if (!audioReady || !stretchSynth || !isStretching) return;
+  try {
+    isStretching = false;
+    stretchSynth.triggerRelease();
+  } catch(e) {}
+}
+
+function setDangerPulse(active) {
+  if (!audioReady || !dangerLFO) return;
+  try {
+    if (active) {
+      dangerLFO.start();
+      dangerGain.gain.rampTo(1, 0.3);
+    } else {
+      dangerLFO.stop();
+      dangerGain.gain.rampTo(0, 0.3);
+    }
+  } catch(e) {}
+}
+
+// ─── GAME STATE ────────────────────────────────────────────────────────────
+let gameState = 'start'; // 'start' | 'instructions' | 'playing' | 'levelcomplete' | 'gameover'
+let score = 0;
+let level = 1;
+let timeRemaining = 60;
+let timerInterval = null;
+let snapsCompleted = 0;
+let lastSnapTime = 0;
+let comboMultiplier = 1.0;
+let comboTimer = null;
+let flashAlpha = 0;
+let chainFlashAlpha = 0;
+
+// Level configs
+const LEVELS = [
+  { snap: 140, recoil: 1000, nodes: 6, links: 9, chainThr: 280, time: 60, minSnaps: 4, respawn: 0, moving: 0 },
+  { snap: 120, recoil: 1200, nodes: 8, links: 10, chainThr: 330, time: 55, minSnaps: 6, respawn: 0, moving: 0 },
+  { snap: 100, recoil: 1400, nodes: 10, links: 13, chainThr: 380, time: 50, minSnaps: 8, respawn: 1, moving: 0 },
+  { snap: 85,  recoil: 1600, nodes: 12, links: 16, chainThr: 380, time: 45, minSnaps: 10, respawn: 2, moving: 1 },
+  { snap: 70,  recoil: 1900, nodes: 15, links: 22, chainThr: 380, time: 40, minSnaps: 14, respawn: 3, moving: 3 }
+];
+
+// ─── THREE.JS OBJECTS ──────────────────────────────────────────────────────
+const nodeGroup = new THREE.Group();
+const linkGroup = new THREE.Group();
+scene.add(linkGroup);
+scene.add(nodeGroup);
+
+// Grain overlay (background)
+const grainGeo = new THREE.PlaneGeometry(W, H);
+const grainMat = new THREE.MeshBasicMaterial({ color: 0x4A7B4A, transparent: true, opacity: 0.08 });
+const grainMesh = new THREE.Mesh(grainGeo, grainMat);
+grainMesh.position.z = -1;
+scene.add(grainMesh);
+
+// ─── NODE & LINK DATA ──────────────────────────────────────────────────────
+let nodes = []; // { x, y, vx, vy, mesh, radius, links:[], alive, orbitCenter, orbitRadius, orbitSpeed, orbitAngle, isMoving, respawnCount }
+let links = []; // { a, b, snapped, restLength, mesh/line, stretchRatio, midX, midY, originalA, originalB }
+let draggingLink = null;
+let dragOrigin = { x: 0, y: 0 };
+let dragCurrent = { x: 0, y: 0 };
+let dragStartTime = 0;
+
+// ─── IDLE SIMULATION (start screen) ───────────────────────────────────────
+let idleNodes = [];
+let idleLinks = [];
+let idleGroup = new THREE.Group();
+let idleLinkGroup = new THREE.Group();
+let idleSnapTimer = 0;
+let idleSnapFiring = false;
+let idleSnapProgress = 0;
+let idleSnapLinkIdx = -1;
+
+scene.add(idleLinkGroup);
+scene.add(idleGroup);
+
+function createIdleSimulation() {
+  idleGroup.clear();
+  idleLinkGroup.clear();
+  idleNodes = [];
+  idleLinks = [];
+
+  const R = 160;
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const x = Math.cos(angle) * R;
+    const y = Math.sin(angle) * R;
+    const mesh = createNodeMesh(14, 0xC8F0A0, 0x8FD460);
+    mesh.position.set(x, y, 0);
+    idleGroup.add(mesh);
+    idleNodes.push({
+      x, y, vx: 0, vy: 0,
+      startX: x, startY: y,
+      mesh, driftPhase: i * 0.3,
+      breathPhase: i * (0.3 * 2 * Math.PI / 8)
+    });
+  }
+
+  // Connect adjacent nodes with links
+  const linkPairs = [
+    [0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,0],
+    [0,3],[1,5],[2,6],[3,7]
+  ];
+  for (const [a, b] of linkPairs) {
+    const lineMesh = createLinkLine(idleNodes[a], idleNodes[b], 0xFFFDE0);
+    idleLinkGroup.add(lineMesh);
+    idleLinks.push({ a, b, mesh: lineMesh, snapped: false, alpha: 1.0 });
+  }
+}
+
+function createNodeMesh(radius, fillColor, strokeColor) {
+  const geo = new THREE.CircleGeometry(radius, 32);
+  const mat = new THREE.MeshBasicMaterial({ color: fillColor });
+  const mesh = new THREE.Mesh(geo, mat);
+
+  // Ring
+  const ringGeo = new THREE.RingGeometry(radius, radius + 2.5, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color: strokeColor, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.z = 0.1;
+  mesh.add(ring);
+
+  return mesh;
+}
+
+function createLinkLine(nodeA, nodeB, color) {
+  const points = [
+    new THREE.Vector3(nodeA.x, nodeA.y, 0),
+    new THREE.Vector3((nodeA.x + nodeB.x) / 2, (nodeA.y + nodeB.y) / 2, 0.5),
+    new THREE.Vector3(nodeB.x, nodeB.y, 0)
+  ];
+  const curve = new THREE.QuadraticBezierCurve3(points[0], points[1], points[2]);
+  const pts = curve.getPoints(16);
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 1.0 });
+  return new THREE.Line(geo, mat);
+}
+
+function updateLinkLine(line, ax, ay, cx, cy, bx, by) {
+  const curve = new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(ax, ay, 0),
+    new THREE.Vector3(cx, cy, 0.5),
+    new THREE.Vector3(bx, by, 0)
+  );
+  const pts = curve.getPoints(16);
+  line.geometry.setFromPoints(pts);
+  line.geometry.attributes.position.needsUpdate = true;
+}
+
+// ─── LEVEL GENERATION ─────────────────────────────────────────────────────
+function generateLevel(lvl) {
+  // Clear old
+  nodeGroup.clear();
+  linkGroup.clear();
+  nodes = [];
+  links = [];
+
+  const cfg = LEVELS[lvl - 1];
+  const snapThreshold = cfg.snap;
+
+  // Position nodes
+  const nodeCount = cfg.nodes;
+  const safeMargin = 80;
+  const xRange = W - safeMargin * 2;
+  const yRange = H - safeMargin * 2;
+
+  if (lvl === 1) {
+    // Hexagon arrangement, ~200px diameter
+    const cx = 0, cy = 0;
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
+      const r = 100;
+      addNode(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r, false);
+    }
+    // 9 links (hexagon edges + 3 diagonals)
+    connectNodes(0, 1); connectNodes(1, 2); connectNodes(2, 3);
+    connectNodes(3, 4); connectNodes(4, 5); connectNodes(5, 0);
+    connectNodes(0, 2); connectNodes(1, 4); connectNodes(2, 5);
+  } else if (lvl === 2) {
+    // Two clusters: diamond left, square right
+    const lcx = -130, lcy = 0;
+    const rcx = 130, rcy = 0;
+    // Left diamond
+    addNode(lcx, lcy + 80); // 0 top
+    addNode(lcx - 80, lcy); // 1 left
+    addNode(lcx, lcy - 80); // 2 bottom
+    addNode(lcx + 80, lcy); // 3 right
+    // Right square
+    addNode(rcx - 60, rcy + 60); // 4
+    addNode(rcx + 60, rcy + 60); // 5
+    addNode(rcx + 60, rcy - 60); // 6
+    addNode(rcx - 60, rcy - 60); // 7
+    // Left diamond links (6 with crossing pair)
+    connectNodes(0, 1); connectNodes(1, 2); connectNodes(2, 3); connectNodes(3, 0);
+    connectNodes(0, 2); connectNodes(1, 3); // crossing pair
+    // Right square links (4)
+    connectNodes(4, 5); connectNodes(5, 6); connectNodes(6, 7); connectNodes(7, 4);
+  } else if (lvl === 3) {
+    // Web layout with 3 spine links
+    const positions = [
+      [0, 320], [-180, 200], [180, 200],
+      [-220, 0], [220, 0], [-100, -150],
+      [100, -150], [-200, -280], [0, -300], [200, -280]
+    ];
+    positions.forEach(([x, y]) => addNode(x, y, false));
+    // Spine links (diagonal, high tension)
+    connectNodes(0, 7); connectNodes(0, 9); connectNodes(2, 8);
+    // Web connections
+    connectNodes(0, 1); connectNodes(0, 2);
+    connectNodes(1, 3); connectNodes(2, 4);
+    connectNodes(3, 5); connectNodes(4, 6);
+    connectNodes(5, 8); connectNodes(6, 8);
+    connectNodes(7, 8); connectNodes(8, 9);
+    connectNodes(1, 5); connectNodes(2, 6);
+  } else if (lvl === 4) {
+    // 12 nodes, one orbiting satellite
+    const cx = 0, cy = 0;
+    // Inner cluster
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      addNode(cx + Math.cos(a) * 80, cy + Math.sin(a) * 80, false);
+    }
+    // Outer ring
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + 0.3;
+      addNode(cx + Math.cos(a) * 200, cy + Math.sin(a) * 200, false);
+    }
+    // Satellite (moving)
+    const satNode = addNode(cx + 120, cy, true);
+    satNode.orbitCenter = { x: cx, y: cy };
+    satNode.orbitRadius = 120;
+    satNode.orbitSpeed = 60; // px/s equivalent in radians
+    satNode.orbitAngle = 0;
+    satNode.isMoving = true;
+
+    // Inner connections
+    connectNodes(0,1); connectNodes(1,2); connectNodes(2,3);
+    connectNodes(3,4); connectNodes(4,5); connectNodes(5,0);
+    connectNodes(0,3); connectNodes(1,4);
+    // Outer connections
+    connectNodes(6,7); connectNodes(7,8); connectNodes(8,9); connectNodes(9,10);
+    connectNodes(6,1); connectNodes(7,2); connectNodes(8,3);
+    // Satellite links
+    connectNodes(11, 0); connectNodes(11, 1); connectNodes(11, 2); connectNodes(11, 3);
+  } else {
+    // Level 5: 15 nodes, 3 orbiting, dense web
+    const cx = 0, cy = 0;
+    // Core nodes
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      addNode(cx + Math.cos(a) * 70, cy + Math.sin(a) * 70, false);
+    }
+    // Mid ring
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + 0.5;
+      addNode(cx + Math.cos(a) * 160, cy + Math.sin(a) * 160, false);
+    }
+    // Static outer
+    addNode(cx - 220, cy + 100, false); // 12
+    addNode(cx + 220, cy - 100, false); // 13
+    addNode(cx, cy - 300, false);       // 14
+
+    // Moving nodes
+    const sat1 = addNode(cx + 90, cy, true);
+    sat1.orbitCenter = { x: cx, y: cy }; sat1.orbitRadius = 90; sat1.orbitSpeed = 60 / 90; sat1.orbitAngle = 0; sat1.isMoving = true;
+
+    const sat2 = addNode(cx + 130, cy, true);
+    sat2.orbitCenter = { x: cx, y: cy }; sat2.orbitRadius = 130; sat2.orbitSpeed = 75 / 130; sat2.orbitAngle = Math.PI / 3; sat2.isMoving = true;
+
+    const sat3 = addNode(cx + 160, cy, true);
+    sat3.orbitCenter = { x: cx, y: cy }; sat3.orbitRadius = 160; sat3.orbitSpeed = 80 / 160; sat3.orbitAngle = Math.PI * 2 / 3; sat3.isMoving = true;
+
+    // Core connections
+    connectNodes(0,1); connectNodes(1,2); connectNodes(2,3); connectNodes(3,4); connectNodes(4,5); connectNodes(5,0);
+    connectNodes(0,3); connectNodes(1,4); connectNodes(2,5);
+    // Mid to core
+    connectNodes(6,0); connectNodes(7,1); connectNodes(8,2); connectNodes(9,3); connectNodes(10,4); connectNodes(11,5);
+    // Mid ring
+    connectNodes(6,7); connectNodes(7,8); connectNodes(8,9); connectNodes(9,10); connectNodes(10,11); connectNodes(11,6);
+    // Outer
+    connectNodes(12, 6); connectNodes(12, 11);
+    connectNodes(13, 8); connectNodes(13, 9);
+    connectNodes(14, 6); connectNodes(14, 7);
+    // Satellite links
+    connectNodes(15, 0); connectNodes(15, 1);
+    connectNodes(16, 6); connectNodes(16, 7); connectNodes(16, 2);
+    connectNodes(17, 10); connectNodes(17, 11); connectNodes(17, 5);
+  }
+}
+
+function addNode(x, y, isMoving = false) {
+  const mesh = createNodeMesh(16, 0xC8F0A0, 0x8FD460);
+  mesh.position.set(x, y, 0);
+  nodeGroup.add(mesh);
+  const n = {
+    x, y, vx: 0, vy: 0,
+    mesh, radius: 16,
+    links: [],
+    alive: true,
+    isMoving,
+    orbitCenter: null, orbitRadius: 0, orbitSpeed: 0, orbitAngle: 0,
+    breathPhase: Math.random() * Math.PI * 2,
+    breathScale: 1.0,
+    respawnCount: 0,
+    startX: x, startY: y
+  };
+  nodes.push(n);
+  return n;
+}
+
+function connectNodes(ai, bi) {
+  const a = nodes[ai], b = nodes[bi];
+  if (!a || !b) return;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const restLength = Math.sqrt(dx*dx + dy*dy);
+
+  const lineMesh = createLinkLine(a, b, 0xFFFDE0);
+  linkGroup.add(lineMesh);
+
+  const lnk = {
+    a: ai, b: bi,
+    snapped: false,
+    restLength,
+    mesh: lineMesh,
+    stretchRatio: 0,
+    midX: (a.x + b.x) / 2,
+    midY: (a.y + b.y) / 2,
+    alpha: 1.0,
+    regenAlpha: 1.0
+  };
+  links.push(lnk);
+  a.links.push(links.length - 1);
+  b.links.push(links.length - 1);
+}
+
+// ─── DRAG INPUT ────────────────────────────────────────────────────────────
+let pointerDown = false;
+
+canvas.addEventListener('pointerdown', onPointerDown);
+canvas.addEventListener('pointermove', onPointerMove);
+canvas.addEventListener('pointerup', onPointerUp);
+canvas.addEventListener('pointercancel', onPointerUp);
+
+function onPointerDown(e) {
+  if (gameState !== 'playing') return;
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const wx = e.clientX, wy = e.clientY;
+  const world = screenToWorld(wx, wy);
+
+  // Find closest link midpoint within 28px
+  let bestLink = null, bestDist = Infinity;
+  for (let i = 0; i < links.length; i++) {
+    const lnk = links[i];
+    if (lnk.snapped) continue;
+    const dx = world.x - lnk.midX;
+    const dy = world.y - lnk.midY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    // Convert 28px to world units
+    const { x: s0 } = worldToScreen(0, 0);
+    const { x: s1 } = worldToScreen(28, 0);
+    const hitRadius = (s1 - s0); // world units per pixel
+    if (dist < 28 && dist < bestDist) {
+      bestDist = dist;
+      bestLink = i;
+    }
+  }
+
+  if (bestLink !== null) {
+    draggingLink = bestLink;
+    dragOrigin = { x: world.x, y: world.y };
+    dragCurrent = { x: world.x, y: world.y };
+    dragStartTime = performance.now();
+    pointerDown = true;
+    startStretchSFX(0);
+  }
+}
+
+function onPointerMove(e) {
+  if (!pointerDown || draggingLink === null || gameState !== 'playing') return;
+  e.preventDefault();
+  const world = screenToWorld(e.clientX, e.clientY);
+  dragCurrent = { x: world.x, y: world.y };
+
+  // Update link visual
+  const lnk = links[draggingLink];
+  if (!lnk || lnk.snapped) return;
+
+  const a = nodes[lnk.a], b = nodes[lnk.b];
+  const cfg = LEVELS[level - 1];
+
+  // Drag distance from link midpoint (resting)
+  const restMidX = (a.x + b.x) / 2;
+  const restMidY = (a.y + b.y) / 2;
+  const dx = dragCurrent.x - restMidX;
+  const dy = dragCurrent.y - restMidY;
+  const dragDist = Math.sqrt(dx*dx + dy*dy);
+
+  if (dragDist < 20) return; // dead zone
+
+  const snapThreshold = cfg.snap;
+  const clampedDist = Math.min(dragDist, snapThreshold * 1.2);
+  const stretchRatio = clampedDist / snapThreshold;
+  lnk.stretchRatio = stretchRatio;
+
+  // Update midpoint
+  lnk.midX = restMidX + dx * (clampedDist / Math.max(dragDist, 1));
+  lnk.midY = restMidY + dy * (clampedDist / Math.max(dragDist, 1));
+
+  // Color interpolation
+  let linkColor;
+  if (stretchRatio < 0.5) {
+    linkColor = lerpColor(0xFFFDE0, 0xFFD700, stretchRatio / 0.5);
+  } else if (stretchRatio < 0.8) {
+    linkColor = lerpColor(0xFFD700, 0xFF6B1A, (stretchRatio - 0.5) / 0.3);
+  } else {
+    linkColor = 0xFF6B1A;
+  }
+  lnk.mesh.material.color.setHex(linkColor);
+
+  // Update bezier
+  updateLinkLine(lnk.mesh, a.x, a.y, lnk.midX, lnk.midY, b.x, b.y);
+
+  // SFX
+  startStretchSFX(stretchRatio);
+
+  // Auto-snap at threshold
+  if (stretchRatio >= 1.0) {
+    triggerSnap(draggingLink, e.clientX);
+    pointerDown = false;
+    draggingLink = null;
+  }
+}
+
+function onPointerUp(e) {
+  if (!pointerDown || draggingLink === null) return;
+  pointerDown = false;
+  stopStretchSFX();
+
+  const lnk = links[draggingLink];
+  if (lnk && !lnk.snapped) {
+    // Spring rebound — reset midpoint
+    const a = nodes[lnk.a], b = nodes[lnk.b];
+    lnk.midX = (a.x + b.x) / 2;
+    lnk.midY = (a.y + b.y) / 2;
+    lnk.stretchRatio = 0;
+    lnk.mesh.material.color.setHex(0xFFFDE0);
+    updateLinkLine(lnk.mesh, a.x, a.y, lnk.midX, lnk.midY, b.x, b.y);
+  }
+  draggingLink = null;
+}
+
+// ─── SNAP LOGIC ────────────────────────────────────────────────────────────
+function triggerSnap(linkIdx, screenX = window.innerWidth / 2) {
+  const lnk = links[linkIdx];
+  if (!lnk || lnk.snapped) return;
+  lnk.snapped = true;
+  stopStretchSFX();
+
+  const a = nodes[lnk.a], b = nodes[lnk.b];
+  const cfg = LEVELS[level - 1];
+
+  // Recoil impulse
+  const snapMidX = lnk.midX, snapMidY = lnk.midY;
+  const dax = a.x - snapMidX, day = a.y - snapMidY;
+  const dbx = b.x - snapMidX, dby = b.y - snapMidY;
+  const lenA = Math.sqrt(dax*dax + day*day) || 1;
+  const lenB = Math.sqrt(dbx*dbx + dby*dby) || 1;
+
+  const force = Math.max(lnk.stretchRatio, 1.0) * cfg.recoil;
+  const velCap = 900;
+
+  a.vx += Math.min(dax / lenA * force, velCap);
+  a.vy += Math.min(day / lenA * force, velCap);
+  b.vx += Math.min(dbx / lenB * force, velCap);
+  b.vy += Math.min(dby / lenB * force, velCap);
+
+  // Cap velocity
+  const speedA = Math.sqrt(a.vx*a.vx + a.vy*a.vy);
+  if (speedA > velCap) { a.vx = a.vx / speedA * velCap; a.vy = a.vy / speedA * velCap; }
+  const speedB = Math.sqrt(b.vx*b.vx + b.vy*b.vy);
+  if (speedB > velCap) { b.vx = b.vx / speedB * velCap; b.vy = b.vy / speedB * velCap; }
+
+  // Hide link
+  lnk.mesh.visible = false;
+
+  // Remove link from nodes' link lists
+  a.links = a.links.filter(i => i !== linkIdx);
+  b.links = b.links.filter(i => i !== linkIdx);
+
+  // Flash
+  flashAlpha = 1.0;
+
+  // SFX
+  playSnap(screenX);
+
+  // Score
+  snapsCompleted++;
+  const snapTime = (performance.now() - dragStartTime) / 1000;
+  let pts = 100;
+  if (snapTime < 1.5) pts += 50;
+
+  // Combo
+  const now = performance.now();
+  if (now - lastSnapTime < 2000) {
+    comboMultiplier = Math.min(comboMultiplier * 1.2, 3.0);
+  } else {
+    comboMultiplier = 1.0;
+  }
+  lastSnapTime = now;
+  pts = Math.round(pts * comboMultiplier);
+  score += pts;
+  showFloatingScore(pts, snapMidX, snapMidY);
+
+  // Danger pulse check
+  const unsnapped = links.filter(l => !l.snapped).length;
+  setDangerPulse(unsnapped < 3 && unsnapped > 0);
+
+  // Check win
+  checkWin();
+}
+
+function triggerChainSnap(linkIdx, depth, screenX) {
+  if (depth > 6) return;
+  const lnk = links[linkIdx];
+  if (!lnk || lnk.snapped) return;
+
+  setTimeout(() => {
+    if (!lnk.snapped) {
+      lnk.stretchRatio = 1.0;
+      triggerSnap(linkIdx, screenX);
+
+      // Chain score multiplier
+      const chainBonus = Math.round(100 * Math.pow(1.5, depth - 1));
+      score += chainBonus;
+
+      // Chain SFX
+      playChainNote(depth);
+      chainFlashAlpha = 0.6;
+    }
+  }, 80 * depth);
+}
+
+// ─── PHYSICS UPDATE ────────────────────────────────────────────────────────
+const FRICTION = 0.04;
+const RESTITUTION = 0.6;
+
+function physicsUpdate(dt) {
+  const cfg = LEVELS[level - 1];
+
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (!n.alive) continue;
+
+    // Orbit update
+    if (n.isMoving && n.orbitCenter) {
+      n.orbitAngle += n.orbitSpeed * dt;
+      n.x = n.orbitCenter.x + Math.cos(n.orbitAngle) * n.orbitRadius;
+      n.y = n.orbitCenter.y + Math.sin(n.orbitAngle) * n.orbitRadius;
+      n.mesh.position.set(n.x, n.y, 0);
+    } else {
+      // Apply velocity
+      n.x += n.vx * dt;
+      n.y += n.vy * dt;
+
+      // Friction
+      n.vx *= (1 - FRICTION);
+      n.vy *= (1 - FRICTION);
+
+      // Boundary bounce
+      const hw = W / 2 - n.radius;
+      const hh = H / 2 - n.radius;
+      if (n.x < -hw) { n.x = -hw; n.vx = Math.abs(n.vx) * RESTITUTION; playRecoil(); addBoundaryScore(n); }
+      if (n.x > hw)  { n.x = hw;  n.vx = -Math.abs(n.vx) * RESTITUTION; playRecoil(); addBoundaryScore(n); }
+      if (n.y < -hh) { n.y = -hh; n.vy = Math.abs(n.vy) * RESTITUTION; playRecoil(); addBoundaryScore(n); }
+      if (n.y > hh)  { n.y = hh;  n.vy = -Math.abs(n.vy) * RESTITUTION; playRecoil(); addBoundaryScore(n); }
+
+      n.mesh.position.set(n.x, n.y, 0);
+    }
+
+    // Breath animation
+    n.breathPhase += dt * (2 * Math.PI / 2.4);
+    const breathScale = 1.0 + 0.08 * Math.sin(n.breathPhase);
+    n.mesh.scale.setScalar(breathScale);
+  }
+
+  // Update active (non-snapped) link midpoints
+  for (let i = 0; i < links.length; i++) {
+    const lnk = links[i];
+    if (lnk.snapped) continue;
+    const a = nodes[lnk.a], b = nodes[lnk.b];
+    if (!a || !b) continue;
+
+    if (draggingLink !== i) {
+      lnk.midX = (a.x + b.x) / 2;
+      lnk.midY = (a.y + b.y) / 2;
+      updateLinkLine(lnk.mesh, a.x, a.y, lnk.midX, lnk.midY, b.x, b.y);
+    }
+  }
+
+  // Check chain reactions (node collisions)
+  for (let i = 0; i < nodes.length; i++) {
+    const ni = nodes[i];
+    if (!ni.alive) continue;
+    const speedI = Math.sqrt(ni.vx*ni.vx + ni.vy*ni.vy);
+    if (speedI < cfg.chainThr) continue;
+
+    for (let j = i + 1; j < nodes.length; j++) {
+      const nj = nodes[j];
+      if (!nj.alive) continue;
+
+      const dx = nj.x - ni.x, dy = nj.y - ni.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < ni.radius + nj.radius + 10) {
+        // Collision! Chain-snap all links on struck node
+        if (nj.links.length > 0) {
+          const snaps = [...nj.links];
+          snaps.forEach((lIdx, depth) => {
+            triggerChainSnap(lIdx, depth + 1, window.innerWidth / 2);
+          });
+        }
+      }
+    }
+  }
+}
+
+function addBoundaryScore(node) {
+  const speed = Math.sqrt(node.vx*node.vx + node.vy*node.vy);
+  if (speed > 500) {
+    score += 25;
+    showFloatingScore(25, node.x, node.y);
+  }
+}
+
+// ─── FLOATING SCORE TEXT (2D overlay) ────────────────────────────────────
+const floatingTexts = [];
+
+function showFloatingScore(pts, wx, wy) {
+  const screen = worldToScreen(wx, wy);
+  floatingTexts.push({ text: `+${pts}`, x: screen.x, y: screen.y, alpha: 1.0, vy: -1.5, life: 1.2 });
+}
+
+// ─── WIN/LOSE ──────────────────────────────────────────────────────────────
+function checkWin() {
+  const cfg = LEVELS[level - 1];
+  if (snapsCompleted >= cfg.minSnaps) {
+    winLevel();
+  }
+}
+
+function winLevel() {
+  gameState = 'levelcomplete';
+  clearInterval(timerInterval);
+  playLevelClear();
+  score += timeRemaining * 10;
+  setDangerPulse(false);
+  showResult(true);
+}
+
+function loseLevel() {
+  gameState = 'gameover';
+  clearInterval(timerInterval);
+  playLevelFail();
+  setDangerPulse(false);
+  showResult(false);
+}
+
+let resultOverlay = null;
+
+function showResult(won) {
+  // Show on overlay2d
+  if (resultOverlay) return;
+  resultOverlay = { won, alpha: 0, timer: 0 };
+}
+
+// ─── TIMER ────────────────────────────────────────────────────────────────
+function startTimer() {
+  const cfg = LEVELS[level - 1];
+  timeRemaining = cfg.time;
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if (gameState !== 'playing') return;
+    timeRemaining--;
+    if (timeRemaining <= 0) {
+      timeRemaining = 0;
+      loseLevel();
+    }
+  }, 1000);
+}
+
+// ─── IDLE ANIMATION UPDATE ─────────────────────────────────────────────────
+let idleElapsed = 0;
+let secondaryIdleTimer = 0;
+
+function updateIdle(dt) {
+  idleElapsed += dt;
+  secondaryIdleTimer += dt;
+
+  for (let i = 0; i < idleNodes.length; i++) {
+    const n = idleNodes[i];
+    // Breath
+    n.driftPhase += dt;
+    const breath = 1.0 + 0.08 * Math.sin(n.breathPhase + idleElapsed / 2.4 * Math.PI * 2);
+    n.mesh.scale.setScalar(breath);
+
+    // Velocity + friction
+    n.x += n.vx * dt;
+    n.y += n.vy * dt;
+    n.vx *= 0.97;
+    n.vy *= 0.97;
+
+    // Drift back to start if not snapping
+    if (!idleSnapFiring) {
+      n.x += (n.startX - n.x) * 0.02;
+      n.y += (n.startY - n.y) * 0.02;
+    }
+
+    n.mesh.position.set(n.x, n.y, 0);
+  }
+
+  // Idle snap cycle
+  idleSnapTimer += dt;
+  if (!idleSnapFiring && idleSnapTimer >= 4.5) {
+    idleSnapTimer = 0;
+    idleSnapFiring = true;
+    idleSnapProgress = 0;
+    // Pick a non-snapped link
+    const available = idleLinks.filter((l, i) => !l.snapped && l.alpha > 0.9);
+    if (available.length > 0) {
+      idleSnapLinkIdx = idleLinks.indexOf(available[Math.floor(Math.random() * available.length)]);
+    }
+  }
+
+  if (idleSnapFiring && idleSnapLinkIdx >= 0) {
+    idleSnapProgress += dt / 0.8;
+    const lnk = idleLinks[idleSnapLinkIdx];
+    const a = idleNodes[lnk.a], b = idleNodes[lnk.b];
+    const midX = (a.startX + b.startX) / 2;
+    const midY = (a.startY + b.startY) / 2;
+    const outDir = { x: midX / (Math.sqrt(midX*midX + midY*midY) || 1), y: midY / (Math.sqrt(midX*midX + midY*midY) || 1) };
+
+    if (idleSnapProgress < 1.0) {
+      const pull = idleSnapProgress * 90;
+      const cmx = midX + outDir.x * pull;
+      const cmy = midY + outDir.y * pull;
+      updateLinkLine(lnk.mesh, a.x, a.y, cmx, cmy, b.x, b.y);
+      lnk.mesh.material.color.setHex(idleSnapProgress > 0.8 ? 0xFF6B1A : (idleSnapProgress > 0.5 ? 0xFFD700 : 0xFFFDE0));
+    } else if (idleSnapProgress >= 1.0 && !lnk.snapped) {
+      // Fire snap
+      lnk.snapped = true;
+      lnk.mesh.visible = false;
+      const force = 600;
+      a.vx -= outDir.x * force * 0.5;
+      a.vy -= outDir.y * force * 0.5;
+      b.vx += outDir.x * force * 0.5;
+      b.vy += outDir.y * force * 0.5;
+
+      // Regen after 2s
+      setTimeout(() => {
+        lnk.snapped = false;
+        lnk.alpha = 0;
+        lnk.mesh.visible = true;
+        lnk.mesh.material.color.setHex(0xFFFDE0);
+        // Fade in
+        let fadeT = 0;
+        const fadeIn = setInterval(() => {
+          fadeT += 0.05;
+          lnk.alpha = Math.min(fadeT / 0.6, 1.0);
+          lnk.mesh.material.opacity = lnk.alpha;
+          if (lnk.alpha >= 1.0) clearInterval(fadeIn);
+        }, 50);
+      }, 2000);
+
+      idleSnapFiring = false;
+      idleSnapLinkIdx = -1;
+    }
+  }
+
+  // Update idle link midpoints
+  for (const lnk of idleLinks) {
+    if (lnk.snapped) continue;
+    const a = idleNodes[lnk.a], b = idleNodes[lnk.b];
+    const t = idleElapsed;
+    const phaseX = lnk.a * 0.7;
+    const phaseY = lnk.b * 0.5;
+    const cmx = (a.x + b.x) / 2 + Math.sin(t * 0.11 * 2 * Math.PI + phaseX) * 8;
+    const cmy = (a.y + b.y) / 2 + Math.sin(t * 0.17 * 2 * Math.PI + phaseY) * 8;
+    if (idleSnapFiring && idleLinks.indexOf(lnk) === idleSnapLinkIdx) continue;
+    updateLinkLine(lnk.mesh, a.x, a.y, cmx, cmy, b.x, b.y);
+  }
+
+  // Secondary idle snap at 8s
+  if (secondaryIdleTimer >= 8) {
+    secondaryIdleTimer = 0;
+    // Small chain reaction visual
+  }
+}
+
+// ─── COLOR LERP ───────────────────────────────────────────────────────────
+function lerpColor(a, b, t) {
+  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+  return ((Math.round(ar + (br-ar)*t) << 16) | (Math.round(ag + (bg-ag)*t) << 8) | Math.round(ab + (bb-ab)*t));
+}
+
+// ─── SCREEN TRANSITIONS ────────────────────────────────────────────────────
+const startScreen = document.getElementById('startScreen');
+const instructionsScreen = document.getElementById('instructionsScreen');
+
+startScreen.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (gameState !== 'start') return;
+  gameState = 'instructions';
+  initAudio().catch(() => {});
+  startScreen.style.opacity = '0';
+  setTimeout(() => {
+    startScreen.style.display = 'none';
+    instructionsScreen.style.display = 'flex';
+    instructionsScreen.style.opacity = '1';
+    // Hide idle simulation
+    idleGroup.visible = false;
+    idleLinkGroup.visible = false;
+  }, 300);
+});
+
+instructionsScreen.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (gameState !== 'instructions') return;
+  instructionsScreen.style.opacity = '0';
+  setTimeout(() => {
+    instructionsScreen.style.display = 'none';
+    gameState = 'playing';
+    startGame();
+  }, 300);
+});
+
+function startGame() {
+  score = 0;
+  level = 1;
+  snapsCompleted = 0;
+  comboMultiplier = 1.0;
+  draggingLink = null;
+  pointerDown = false;
+  resultOverlay = null;
+  floatingTexts.length = 0;
+  generateLevel(level);
+  startTimer();
+  if (audioReady && musicFilter) {
+    musicFilter.frequency.rampTo(80, 1.8);
+  }
+}
+
+function nextLevel() {
+  level++;
+  if (level > 5) level = 5;
+  snapsCompleted = 0;
+  draggingLink = null;
+  pointerDown = false;
+  resultOverlay = null;
+  floatingTexts.length = 0;
+  generateLevel(level);
+  gameState = 'playing';
+  startTimer();
+}
+
+function retryLevel() {
+  snapsCompleted = 0;
+  draggingLink = null;
+  pointerDown = false;
+  resultOverlay = null;
+  floatingTexts.length = 0;
+  generateLevel(level);
+  gameState = 'playing';
+  startTimer();
+}
+
+// Result overlay pointer handler
+overlay.addEventListener('pointerdown', (e) => {
+  if (gameState === 'levelcomplete' || gameState === 'gameover') {
+    e.preventDefault();
+    if (gameState === 'levelcomplete') nextLevel();
+    else retryLevel();
+  }
+});
+
+// ─── 2D OVERLAY DRAW ──────────────────────────────────────────────────────
+function draw2D() {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  hudCtx.clearRect(0, 0, vw, vh);
+
+  if (gameState === 'playing' || gameState === 'levelcomplete' || gameState === 'gameover') {
+    // HUD: Score
+    hudCtx.font = 'bold 28px "Courier New", monospace';
+    hudCtx.fillStyle = '#EAFFCC';
+    hudCtx.textAlign = 'right';
+    hudCtx.fillText(score.toString().padStart(6, '0'), vw - 20, 40);
+
+    // Level indicator
+    hudCtx.font = '14px "Courier New", monospace';
+    hudCtx.fillStyle = '#8FD460';
+    hudCtx.textAlign = 'left';
+    hudCtx.fillText(`LEVEL ${level}`, 20, 40);
+
+    // Timer
+    const cfg = LEVELS[level - 1];
+    const tPct = timeRemaining / cfg.time;
+    const timerColor = tPct > 0.4 ? '#EAFFCC' : '#FF6B1A';
+    hudCtx.font = 'bold 22px "Courier New", monospace';
+    hudCtx.fillStyle = timerColor;
+    hudCtx.textAlign = 'center';
+    const secs = Math.max(0, Math.ceil(timeRemaining));
+    hudCtx.fillText(`${Math.floor(secs/60)}:${(secs%60).toString().padStart(2,'0')}`, vw/2, 40);
+
+    // Snaps progress
+    hudCtx.font = '13px "Courier New", monospace';
+    hudCtx.fillStyle = '#8FD460';
+    hudCtx.textAlign = 'left';
+    hudCtx.fillText(`${snapsCompleted}/${cfg.minSnaps} snaps`, 20, 65);
+
+    // Combo
+    if (comboMultiplier > 1.05) {
+      hudCtx.font = 'bold 16px "Courier New", monospace';
+      hudCtx.fillStyle = '#FF3366';
+      hudCtx.textAlign = 'right';
+      hudCtx.fillText(`×${comboMultiplier.toFixed(1)} COMBO`, vw - 20, 70);
+    }
+  }
+
+  // Floating score texts
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.y += ft.vy;
+    ft.life -= 0.016;
+    ft.alpha = Math.max(0, ft.life / 1.2);
+    if (ft.life <= 0) { floatingTexts.splice(i, 1); continue; }
+    hudCtx.globalAlpha = ft.alpha;
+    hudCtx.font = 'bold 20px "Courier New", monospace';
+    hudCtx.fillStyle = '#EAFFCC';
+    hudCtx.textAlign = 'center';
+    hudCtx.fillText(ft.text, ft.x, ft.y);
+    hudCtx.globalAlpha = 1.0;
+  }
+
+  // Flash overlay (white recoil flash)
+  if (flashAlpha > 0) {
+    hudCtx.globalAlpha = flashAlpha * 0.6;
+    hudCtx.fillStyle = '#FFFFFF';
+    hudCtx.fillRect(0, 0, vw, vh);
+    hudCtx.globalAlpha = 1.0;
+    flashAlpha *= 0.8;
+    if (flashAlpha < 0.01) flashAlpha = 0;
+  }
+
+  // Chain reaction flash
+  if (chainFlashAlpha > 0) {
+    hudCtx.globalAlpha = chainFlashAlpha * 0.4;
+    hudCtx.fillStyle = '#FF3366';
+    hudCtx.fillRect(0, 0, vw, vh);
+    hudCtx.globalAlpha = 1.0;
+    chainFlashAlpha *= 0.75;
+    if (chainFlashAlpha < 0.01) chainFlashAlpha = 0;
+  }
+
+  // Result overlays
+  if (resultOverlay) {
+    resultOverlay.timer += 0.016;
+    resultOverlay.alpha = Math.min(resultOverlay.timer / 0.5, 1.0);
+
+    hudCtx.globalAlpha = resultOverlay.alpha * 0.85;
+    hudCtx.fillStyle = resultOverlay.won ? 'rgba(58,107,58,0.95)' : 'rgba(30,20,20,0.95)';
+    hudCtx.fillRect(vw/2 - 200, vh/2 - 120, 400, 240);
+    hudCtx.globalAlpha = resultOverlay.alpha;
+
+    hudCtx.font = 'bold 36px "Courier New", monospace';
+    hudCtx.fillStyle = resultOverlay.won ? '#EAFFCC' : '#FF6B1A';
+    hudCtx.textAlign = 'center';
+    hudCtx.fillText(resultOverlay.won ? 'LEVEL CLEAR!' : 'TIME UP!', vw/2, vh/2 - 50);
+
+    hudCtx.font = '18px "Courier New", monospace';
+    hudCtx.fillStyle = '#8FD460';
+    hudCtx.fillText(`Score: ${score}`, vw/2, vh/2);
+
+    if (resultOverlay.won) {
+      hudCtx.font = '14px "Courier New", monospace';
+      hudCtx.fillStyle = '#EAFFCC';
+      hudCtx.fillText(`+${timeRemaining * 10} time bonus`, vw/2, vh/2 + 30);
+    }
+
+    hudCtx.font = '14px "Courier New", monospace';
+    hudCtx.fillStyle = '#8FD460';
+    hudCtx.fillText(resultOverlay.won ? 'TAP TO CONTINUE' : 'TAP TO RETRY', vw/2, vh/2 + 80);
+    hudCtx.globalAlpha = 1.0;
+  }
+}
+
+// ─── MAIN LOOP ─────────────────────────────────────────────────────────────
+let lastTime = 0;
+
+function animate(time) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((time - lastTime) / 1000, 0.033);
+  lastTime = time;
+
+  if (gameState === 'start') {
+    updateIdle(dt);
+  } else if (gameState === 'playing') {
+    physicsUpdate(dt);
+  }
+
+  composer.render();
+  draw2D();
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────────────
+createIdleSimulation();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
