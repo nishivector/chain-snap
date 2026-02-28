@@ -1380,14 +1380,14 @@ function retryLevel() {
   startTimer();
 }
 
-// Result overlay pointer handler
-overlay.addEventListener('pointerdown', (e) => {
+// Result overlay pointer handler — must be on document since overlay2d has pointer-events:none
+document.addEventListener('pointerdown', (e) => {
   if (gameState === 'levelcomplete' || gameState === 'gameover') {
     e.preventDefault();
     if (gameState === 'levelcomplete') nextLevel();
     else retryLevel();
   }
-});
+}, { capture: true });
 
 // ─── 2D OVERLAY DRAW ──────────────────────────────────────────────────────
 function draw2D() {
